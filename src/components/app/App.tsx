@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 
 import 'antd/dist/antd.css';
-import { UserOutlined } from '@ant-design/icons';
-import { Avatar, Button, Modal, Select, Space, Table } from 'antd';
+import './App.css';
+import { Button, Input, Modal, Select, Space, Table } from 'antd';
 import { Option } from 'antd/es/mentions';
-import Search from 'antd/lib/input/Search';
 import axios from 'axios';
 import { useFormik } from 'formik';
+
+import { github } from '../../assets';
 
 export const App = () => {
   const API_URL = 'https://api.github.com';
@@ -21,11 +22,12 @@ export const App = () => {
     user: any,
     language: string,
     page: number,
+    pageSize: number,
   ) => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `${API_URL}/search/code?q=${codeName}+user:${user}+language:${language}&per_page=10&page=${page}`,
+        `${API_URL}/search/code?q=${codeName}+user:${user}+language:${language}&per_page=${pageSize}&page=${page}`,
       );
       setData(res.data);
       setTotalCount(res.data.total_count);
@@ -51,29 +53,45 @@ export const App = () => {
   const columns = [
     {
       title: 'File name',
-      dataIndex: ['repository', 'owner', 'login'],
-      render: (el: any, record: any) => (
-        <div className="d-inline-flex">
-          <div className="align-self-center">{el}</div>
+      dataIndex: 'name',
+      align: 'left' as 'left',
+    },
+    {
+      title: 'Avatar',
+      dataIndex: ['repository', 'owner', 'avatar_url'],
+      align: 'center' as 'center',
+      render: (el: any) => (
+        <>
           <button
             type="button"
             style={{ background: 'transparent', border: 'none' }}
             onClick={() => setIsOpen(true)}
           >
-            <Avatar icon={<UserOutlined />} />
+            <img src={el} alt="avatar" className="avatar" />
           </button>
-          <ModalWithImage avatar={record.repository.owner.avatar_url} />
-        </div>
+          <ModalWithImage avatar={el} />
+        </>
       ),
     },
-    { title: 'Description', dataIndex: ['repository', 'description'] },
-    { title: 'Owner', dataIndex: ['repository', 'owner', 'login'] },
+    {
+      title: 'Description',
+      dataIndex: ['repository', 'description'],
+      align: 'center' as 'center',
+      render: (el: string) => (!el ? '—' : el),
+    },
+    {
+      title: 'Owner',
+      dataIndex: ['repository', 'owner', 'login'],
+      align: 'center' as 'center',
+    },
     {
       title: 'Github',
       dataIndex: 'html_url',
+      align: 'center' as 'center',
+      width: '10%',
       render: (el: any) => (
         <a href={el} target="_blank" rel="noreferrer" className="pl-5">
-          github
+          <img src={github} alt="github" className="avatar" />
         </a>
       ),
     },
@@ -90,6 +108,7 @@ export const App = () => {
       user: '',
       language: '',
       page: 1,
+      pageSize: 10,
     },
     validate: values => {
       const errors: FormikErrorType = {};
@@ -102,7 +121,13 @@ export const App = () => {
       return errors;
     },
     onSubmit: values => {
-      fetchResults(values.codeName, values.user, values.language, values.page);
+      fetchResults(
+        values.codeName,
+        values.user,
+        values.language,
+        values.page,
+        values.pageSize,
+      );
     },
   });
 
@@ -110,9 +135,10 @@ export const App = () => {
     <>
       <div className="d-flex justify-content-center py-5">
         <form onSubmit={formik.handleSubmit}>
-          <Space direction="vertical">
-            <Search
-              placeholder="input search text"
+          <Space direction="vertical" className="gap-1">
+            <p className="mb-0 mt-2">Phrase</p>
+            <Input
+              placeholder="provide a phrase"
               allowClear
               size="large"
               id="codeName"
@@ -125,8 +151,9 @@ export const App = () => {
               <div style={{ color: 'red' }}>{formik.errors.codeName}</div>
             ) : null}
 
-            <Search
-              placeholder="input search user"
+            <p className="mb-0 mt-2">User</p>
+            <Input
+              placeholder="provide a user"
               allowClear
               size="large"
               id="user"
@@ -140,7 +167,10 @@ export const App = () => {
               <div style={{ color: 'red' }}>{formik.errors.user}</div>
             ) : null}
 
+            <p className="mb-0 mt-2">Language</p>
             <Select
+              showSearch
+              placeholder="choose a language"
               defaultValue={formik.values.language}
               labelInValue
               style={{
@@ -149,23 +179,17 @@ export const App = () => {
               onChange={(value: any) => formik.setFieldValue('language', value.value)}
               value={formik.values.language}
             >
+              <Option value="">All</Option>
               <Option value="ruby">Ruby</Option>
               <Option value="go">Go</Option>
               <Option value="javascript">TypeScript</Option>
             </Select>
 
-            <Button htmlType="submit" type="primary">
+            <Button htmlType="submit" type="primary" className="mt-2">
               Submit
             </Button>
           </Space>
         </form>
-        {/* <Search
-          placeholder="input search text"
-          allowClear
-          size="large"
-          className="w-25"
-          onChange={fetchResults}
-        /> */}
       </div>
       <div className="d-flex justify-content-center">
         <Table
@@ -175,16 +199,18 @@ export const App = () => {
           columns={columns}
           dataSource={data?.items}
           pagination={{
-            pageSize: 10,
             total: totalCount,
-            onChange: page =>
+            pageSizeOptions: ['10', '20', '30', '40', '50'],
+            onChange: (page, pageSize) => {
               fetchResults(
                 formik.values.codeName,
                 formik.values.user,
                 formik.values.language,
                 page,
-              ),
-            showSizeChanger: false,
+                pageSize,
+              );
+            },
+            showSizeChanger: true,
             position: ['bottomCenter'],
           }}
         />
