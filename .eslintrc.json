@@ -32,6 +32,7 @@
     "no-magic-numbers": "off",
     "default-param-last": "off",
     "no-use-before-define": "off",
+    "no-param-reassign": 0,
     "no-multiple-empty-lines": [
       "error",
       {
@@ -39,7 +40,7 @@
       }
     ],
     "@typescript-eslint/no-shadow": [
-      "error"
+      "off"
     ],
     "@typescript-eslint/no-unused-vars": [
       "error"

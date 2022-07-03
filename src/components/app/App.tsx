@@ -1,13 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import 'antd/dist/antd.css';
 import './App.css';
-import { Button, Input, Modal, Select, Space, Table } from 'antd';
-import { Option } from 'antd/es/mentions';
 import axios from 'axios';
-import { useFormik } from 'formik';
+import { FormikProps, useFormik } from 'formik';
+import { toast, ToastContainer } from 'react-toastify';
 
-import { github } from '../../assets';
+import 'react-toastify/dist/ReactToastify.css';
+import { Form } from '../form/Form';
+import { TableComponent } from '../table/TableComponent';
+
+export type MyValues = {
+  codeName: string;
+  user: string;
+  language: string;
+  page: number;
+  pageSize: number;
+};
 
 export const App = () => {
   const API_URL = 'https://api.github.com';
@@ -16,99 +25,42 @@ export const App = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchResults = async (
-    codeName: any,
-    user: any,
+    codeName: string,
+    user: string,
     language: string,
-    page: number,
-    pageSize: number,
+    currentPage: number,
+    size: number,
   ) => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `${API_URL}/search/code?q=${codeName}+user:${user}+language:${language}&per_page=${pageSize}&page=${page}`,
+        `${API_URL}/search/code?q=${codeName}+user:${user}+language:${language}&per_page=${size}&page=${currentPage}`,
       );
       setData(res.data);
       setTotalCount(res.data.total_count);
       setLoading(false);
     } catch (e: any) {
       setLoading(false);
-      throw new Error(e);
+      toast.warning(e.response.data.message);
     }
   };
 
-  type AvatarPropsType = {
-    avatar: any;
-  };
-  // eslint-disable-next-line react/no-unstable-nested-components
-  const ModalWithImage = ({ avatar }: AvatarPropsType) => (
-    <div>
-      <Modal visible={isOpen} footer={null} onCancel={() => setIsOpen(false)}>
-        <img src={avatar} alt="avatar" />
-      </Modal>
-    </div>
-  );
-
-  const columns = [
-    {
-      title: 'File name',
-      dataIndex: 'name',
-      align: 'left' as 'left',
-    },
-    {
-      title: 'Avatar',
-      dataIndex: ['repository', 'owner', 'avatar_url'],
-      align: 'center' as 'center',
-      render: (el: any) => (
-        <>
-          <button
-            type="button"
-            style={{ background: 'transparent', border: 'none' }}
-            onClick={() => setIsOpen(true)}
-          >
-            <img src={el} alt="avatar" className="avatar" />
-          </button>
-          <ModalWithImage avatar={el} />
-        </>
-      ),
-    },
-    {
-      title: 'Description',
-      dataIndex: ['repository', 'description'],
-      align: 'center' as 'center',
-      render: (el: string) => (!el ? '—' : el),
-    },
-    {
-      title: 'Owner',
-      dataIndex: ['repository', 'owner', 'login'],
-      align: 'center' as 'center',
-    },
-    {
-      title: 'Github',
-      dataIndex: 'html_url',
-      align: 'center' as 'center',
-      width: '10%',
-      render: (el: any) => (
-        <a href={el} target="_blank" rel="noreferrer" className="pl-5">
-          <img src={github} alt="github" className="avatar" />
-        </a>
-      ),
-    },
-  ];
-
   type FormikErrorType = {
     codeName?: string;
-    user?: any;
+    user?: string;
   };
 
-  const formik = useFormik({
+  const formik: FormikProps<MyValues> = useFormik<MyValues>({
     initialValues: {
       codeName: '',
       user: '',
       language: '',
-      page: 1,
-      pageSize: 10,
+      page,
+      pageSize,
     },
     validate: values => {
       const errors: FormikErrorType = {};
@@ -131,90 +83,57 @@ export const App = () => {
     },
   });
 
+  useEffect(() => {
+    if (formik.values.codeName || formik.values.user) {
+      fetchResults(
+        formik.values.codeName,
+        formik.values.user,
+        formik.values.language,
+        formik.values.page,
+        formik.values.pageSize,
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (window.localStorage.getItem('codeName') && window.localStorage.getItem('user')) {
+      formik.values.codeName = window.localStorage.getItem('codeName') as string;
+      formik.values.user = window.localStorage.getItem('user') as string;
+      formik.values.language = window.localStorage.getItem('language') as string;
+      formik.values.page = Number(window.localStorage.getItem('page') as string);
+      formik.values.pageSize = Number(window.localStorage.getItem('pageSize') as string);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('codeName', formik.values.codeName);
+    window.localStorage.setItem('user', formik.values.user);
+    window.localStorage.setItem('language', formik.values.language);
+    window.localStorage.setItem('page', String(formik.values.page));
+    window.localStorage.setItem('pageSize', String(formik.values.pageSize));
+  }, [
+    formik.values.codeName,
+    formik.values.user,
+    formik.values.language,
+    formik.values.page,
+    formik.values.pageSize,
+  ]);
+
   return (
     <>
-      <div className="d-flex justify-content-center py-5">
-        <form onSubmit={formik.handleSubmit}>
-          <Space direction="vertical" className="gap-1">
-            <p className="mb-0 mt-2">Phrase</p>
-            <Input
-              placeholder="provide a phrase"
-              allowClear
-              size="large"
-              id="codeName"
-              name="codeName"
-              type="text"
-              onChange={formik.handleChange}
-              value={formik.values.codeName}
-            />
-            {formik.touched.codeName && formik.errors.codeName ? (
-              <div style={{ color: 'red' }}>{formik.errors.codeName}</div>
-            ) : null}
-
-            <p className="mb-0 mt-2">User</p>
-            <Input
-              placeholder="provide a user"
-              allowClear
-              size="large"
-              id="user"
-              name="user"
-              type="text"
-              onChange={formik.handleChange}
-              value={formik.values.user}
-            />
-
-            {formik.touched.user && formik.errors.user ? (
-              <div style={{ color: 'red' }}>{formik.errors.user}</div>
-            ) : null}
-
-            <p className="mb-0 mt-2">Language</p>
-            <Select
-              showSearch
-              placeholder="choose a language"
-              defaultValue={formik.values.language}
-              labelInValue
-              style={{
-                width: 261,
-              }}
-              onChange={(value: any) => formik.setFieldValue('language', value.value)}
-              value={formik.values.language}
-            >
-              <Option value="">All</Option>
-              <Option value="ruby">Ruby</Option>
-              <Option value="go">Go</Option>
-              <Option value="javascript">TypeScript</Option>
-            </Select>
-
-            <Button htmlType="submit" type="primary" className="mt-2">
-              Submit
-            </Button>
-          </Space>
-        </form>
-      </div>
-      <div className="d-flex justify-content-center">
-        <Table
-          size="large"
-          style={{ width: '50%' }}
-          loading={loading}
-          columns={columns}
-          dataSource={data?.items}
-          pagination={{
-            total: totalCount,
-            pageSizeOptions: ['10', '20', '30', '40', '50'],
-            onChange: (page, pageSize) => {
-              fetchResults(
-                formik.values.codeName,
-                formik.values.user,
-                formik.values.language,
-                page,
-                pageSize,
-              );
-            },
-            showSizeChanger: true,
-            position: ['bottomCenter'],
-          }}
-        />
-      </div>
+      <Form formik={formik} />
+      <TableComponent
+        isOpen={isOpen}
+        setIsOpen={setIsOpen}
+        loading={loading}
+        data={data?.items}
+        totalCount={totalCount}
+        formik={formik}
+        setPage={setPage}
+        setPageSize={setPageSize}
+        fetchResults={fetchResults}
+      />
+      <ToastContainer autoClose={2000} />
     </>
   );
 };
